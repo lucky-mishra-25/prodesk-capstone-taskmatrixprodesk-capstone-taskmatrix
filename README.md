@@ -108,7 +108,7 @@ The goal of TaskMatrix is to:
 
 ### 🔗 Figma Wireframes
 
-👉 [View Figma Design](https://your-figma-link-here)
+👉 [View Figma Design](https://www.figma.com/design/6hXYf9dgbkghBDVtmZqhFo/login-page?node-id=0-1&p=f&t=Hsbub3VmGkkFm8QC-0)
 
 ---
 
