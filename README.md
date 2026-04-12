@@ -132,7 +132,11 @@ The goal of TaskMatrix is to:
 
 ### 📊 Entity Relationship Diagram (ERD)
 
-👉 (Add your ERD image here)
+👉## 🏗️ Architecture Diagram (ERD)
+
+<p align="center">
+  <img src="taskmatrix_erd.png" width="700"/>
+</p>
 
 ---
 
