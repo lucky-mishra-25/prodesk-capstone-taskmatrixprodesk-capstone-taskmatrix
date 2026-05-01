@@ -1,183 +1,281 @@
-import React, { useState, useEffect } from "react";
-import "./Dashboard.css";
+import React, { useEffect, useState, useCallback } from "react";
 
 function Dashboard() {
   const [tasks, setTasks] = useState([]);
   const [input, setInput] = useState("");
-
-  const [editId, setEditId] = useState(null);
-  const [editText, setEditText] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const token = localStorage.getItem("token");
+  const BASE_URL = "http://localhost:5000";
 
-  // ===================== FETCH TASKS =====================
+  // =========================
+  // REDIRECT IF NOT LOGGED IN
+  // =========================
   useEffect(() => {
-    const fetchTasks = async () => {
-      try {
-        const res = await fetch("http://localhost:5000/api/tasks", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        const data = await res.json();
-
-        if (res.ok) {
-          setTasks(Array.isArray(data) ? data : []);
-        } else {
-          setTasks([]);
-        }
-      } catch (error) {
-        console.error(error);
-      }
-    };
-
-    if (token) fetchTasks();
+    if (!token) {
+      window.location.href = "/login";
+    }
   }, [token]);
 
-  // ===================== ADD TASK =====================
+  // =========================
+  // FETCH TASKS
+  // =========================
+  const fetchTasks = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${BASE_URL}/api/tasks`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json();
+
+      if (Array.isArray(data)) {
+        setTasks(data);
+      } else {
+        setTasks([]);
+      }
+    } catch (err) {
+      console.error(err);
+      setTasks([]);
+    }
+    setLoading(false);
+  }, [token]);
+
+  useEffect(() => {
+    fetchTasks();
+  }, [fetchTasks]);
+
+  // =========================
+  // ADD TASK
+  // =========================
   const addTask = async () => {
     if (!input.trim()) return;
 
-    const res = await fetch("http://localhost:5000/api/tasks", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ title: input }),
-    });
+    try {
+      const res = await fetch(`${BASE_URL}/api/tasks`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ title: input }),
+      });
 
-    const data = await res.json();
-
-    if (res.ok) {
-      setTasks((prev) => [...prev, data]);
+      const newTask = await res.json();
+      setTasks((prev) => [...prev, newTask]);
       setInput("");
+    } catch (err) {
+      console.error(err);
     }
   };
 
-  // ===================== DELETE TASK =====================
-  const deleteTask = async (id) => {
-    const res = await fetch(`http://localhost:5000/api/tasks/${id}`, {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+  // =========================
+  // EDIT TASK
+  // =========================
+  const editTask = async (id) => {
+    const newTitle = prompt("Edit task:");
+    if (!newTitle) return;
 
-    if (res.ok) {
-      setTasks((prev) => prev.filter((t) => t._id !== id));
-    }
-  };
+    try {
+      const res = await fetch(`${BASE_URL}/api/tasks/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ title: newTitle }),
+      });
 
-  // ===================== UPDATE TASK =====================
-  const updateTask = async (id) => {
-    const res = await fetch(`http://localhost:5000/api/tasks/${id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ title: editText }),
-    });
+      const updated = await res.json();
 
-    const data = await res.json();
-
-    if (res.ok) {
       setTasks((prev) =>
-        prev.map((t) => (t._id === id ? data : t))
+        prev.map((task) => (task._id === id ? updated : task))
       );
-
-      setEditId(null);
-      setEditText("");
+    } catch (err) {
+      console.error(err);
     }
   };
 
-  // ===================== RAZORPAY =====================
-  const upgradeToPro = async () => {
-    const res = await fetch("http://localhost:5000/api/payment/create-order", {
-      method: "POST",
-    });
+  // =========================
+  // TOGGLE COMPLETE
+  // =========================
+  const toggleComplete = async (task) => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/tasks/${task._id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ completed: !task.completed }),
+      });
 
-    const order = await res.json();
+      const updated = await res.json();
 
-    const options = {
-      key: process.env.REACT_APP_RAZORPAY_KEY_ID,
-      amount: order.amount,
-      currency: order.currency,
-      name: "TaskMatrix Pro",
-      description: "Upgrade to Pro Plan",
-      order_id: order.id,
-
-      handler: function (response) {
-        alert("Payment Successful 🎉");
-        console.log(response);
-      },
-    };
-
-    const razor = new window.Razorpay(options);
-    razor.open();
+      setTasks((prev) =>
+        prev.map((t) => (t._id === task._id ? updated : t))
+      );
+    } catch (err) {
+      console.error(err);
+    }
   };
 
+  // =========================
+  // DELETE TASK
+  // =========================
+  const deleteTask = async (id) => {
+    try {
+      await fetch(`${BASE_URL}/api/tasks/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      setTasks((prev) => prev.filter((task) => task._id !== id));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // =========================
+  // AI TASK GENERATION
+  // =========================
+  const generateTasks = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/ai/suggest`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json();
+
+      if (data.success && Array.isArray(data.tasks)) {
+        for (let taskText of data.tasks) {
+          await fetch(`${BASE_URL}/api/tasks`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ title: taskText }),
+          });
+        }
+
+        fetchTasks();
+      } else {
+        alert("AI failed to generate tasks");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // =========================
+  // LOGOUT
+  // =========================
+  const logout = () => {
+    localStorage.removeItem("token");
+    window.location.href = "/login";
+  };
+
+  // =========================
+  // UI
+  // =========================
   return (
-    <div className="dashboard">
+    <div
+      style={{
+        maxWidth: "600px",
+        margin: "auto",
+        padding: "20px",
+        fontFamily: "Arial",
+      }}
+    >
+      <h2>Task Dashboard 🚀</h2>
 
-      <h1>🚀 TaskMatrix Pro</h1>
-
-      {/* UPGRADE BUTTON */}
-      <button onClick={upgradeToPro} style={{ background: "gold" }}>
-        ⭐ Upgrade to Pro
+      <button onClick={logout} style={{ float: "right" }}>
+        Logout
       </button>
 
-      {/* ADD TASK */}
-      <div style={{ textAlign: "center", marginTop: "10px" }}>
+      {/* INPUT */}
+      <div style={{ marginTop: "20px" }}>
         <input
+          type="text"
+          placeholder="Enter task..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Enter your task..."
+          style={{ padding: "10px", marginRight: "10px", width: "60%" }}
         />
+
         <button onClick={addTask}>Add</button>
+
+        <button onClick={generateTasks} style={{ marginLeft: "10px" }}>
+          AI Tasks
+        </button>
+
+        {/* ⭐ UPGRADE BUTTON */}
+        <button
+          onClick={() => (window.location.href = "/upgrade")}
+          style={{
+            marginLeft: "10px",
+            background: "gold",
+            padding: "10px",
+            border: "none",
+            cursor: "pointer",
+            fontWeight: "bold",
+          }}
+        >
+          Upgrade 💎
+        </button>
       </div>
 
+      {/* LOADING */}
+      {loading && <p>Loading...</p>}
+
       {/* TASK LIST */}
-      <div>
-        {tasks.length > 0 ? (
-          tasks.map((t) => (
-            <div className="task" key={t._id}>
-              {editId === t._id ? (
-                <>
-                  <input
-                    value={editText}
-                    onChange={(e) => setEditText(e.target.value)}
-                  />
-                  <button onClick={() => updateTask(t._id)}>
-                    Save
-                  </button>
-                </>
-              ) : (
-                <>
-                  <span>{t.title}</span>
+      <div style={{ marginTop: "20px" }}>
+        {Array.isArray(tasks) && tasks.length > 0 ? (
+          tasks.map((task) => (
+            <div
+              key={task._id}
+              style={{
+                padding: "12px",
+                borderRadius: "8px",
+                background: "#f4f4f4",
+                marginBottom: "10px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <span
+                onClick={() => toggleComplete(task)}
+                style={{
+                  textDecoration: task.completed ? "line-through" : "none",
+                  cursor: "pointer",
+                }}
+              >
+                {task.title}
+              </span>
 
-                  <div>
-                    <button
-                      onClick={() => {
-                        setEditId(t._id);
-                        setEditText(t.title);
-                      }}
-                    >
-                      Edit
-                    </button>
-
-                    <button onClick={() => deleteTask(t._id)}>
-                      Delete
-                    </button>
-                  </div>
-                </>
-              )}
+              <div>
+                <button onClick={() => editTask(task._id)}>✏️</button>
+                <button
+                  onClick={() => deleteTask(task._id)}
+                  style={{ marginLeft: "10px" }}
+                >
+                  ❌
+                </button>
+              </div>
             </div>
           ))
         ) : (
-          <p className="empty">No tasks found 🚀</p>
+          !loading && <p>No tasks found 🚀</p>
         )}
       </div>
     </div>

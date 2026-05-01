@@ -27,7 +27,7 @@ function App() {
         />
 
         <Route
-          path="/premium"
+          path="/upgrade"
           element={
             <ProtectedRoute>
               <Premium />

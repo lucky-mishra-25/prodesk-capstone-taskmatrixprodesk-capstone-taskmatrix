@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const Razorpay = require("razorpay");
+const auth = require("../middleware/authMiddleware");
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
@@ -8,28 +9,36 @@ const razorpay = new Razorpay({
 });
 
 // =======================
-// CREATE ORDER (MATCH FRONTEND)
+// CREATE ORDER
 // =======================
-router.post("/create-order", async (req, res) => {
+router.post("/create-order", auth, async (req, res) => {
   try {
     if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
       return res.status(500).json({
+        success: false,
         message: "Razorpay keys missing",
       });
     }
 
+    const amount = req.body.amount || 49900;
+
     const options = {
-      amount: 49900, // ₹499
+      amount,
       currency: "INR",
       receipt: `receipt_${Date.now()}`,
     };
 
     const order = await razorpay.orders.create(options);
 
-    res.json(order);
+    res.json({
+      success: true,
+      order,
+      key: process.env.RAZORPAY_KEY_ID,
+    });
   } catch (error) {
     console.error("Razorpay Error:", error);
     res.status(500).json({
+      success: false,
       message: "Order creation failed",
       error: error.message,
     });

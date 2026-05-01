@@ -3,18 +3,27 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
+const validate = require("../middleware/validate");
+const {
+  registerSchema,
+  loginSchema,
+} = require("../validators/authValidator");
+
 const router = express.Router();
 
 // =======================
 // REGISTER
 // =======================
-router.post("/register", async (req, res) => {
+router.post("/register", validate(registerSchema), async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ msg: "User already exists" });
+      return res.status(400).json({
+        success: false,
+        message: "User already exists",
+      });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -26,32 +35,39 @@ router.post("/register", async (req, res) => {
     });
 
     res.status(201).json({
-      id: user._id,
-      name: user.name,
-      email: user.email,
+      success: true,
+      data: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+      },
     });
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    next(err); // send to global handler
   }
 });
 
 // =======================
 // LOGIN
 // =======================
-router.post("/login", async (req, res) => {
+router.post("/login", validate(loginSchema), async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email });
-
     if (!user) {
-      return res.status(400).json({ msg: "User not found" });
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
-
     if (!isMatch) {
-      return res.status(400).json({ msg: "Invalid credentials" });
+      return res.status(401).json({
+        success: false,
+        message: "Invalid credentials",
+      });
     }
 
     const token = jwt.sign(
@@ -61,15 +77,18 @@ router.post("/login", async (req, res) => {
     );
 
     res.json({
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
+      success: true,
+      data: {
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+        },
       },
     });
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    next(err);
   }
 });
 
